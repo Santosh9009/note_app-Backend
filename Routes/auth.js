@@ -2,6 +2,11 @@ const express = require("express");
 const router = express.Router();
 const User = require("../Models/User");
 const { body, validationResult } = require("express-validator");
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+
+
+const jwt_secret="thisIsSantosh%%yoo";
 
 router.post(
   "/createuser",
@@ -14,10 +19,11 @@ router.post(
   ],
   async (req, res) => {
     const errors = validationResult(req);
-
+    // returns a bad request if error in request
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
+
     //checks weather if a user with same email exists already
     try {
       let user = await User.findOne({ email: req.body.email });
@@ -26,17 +32,26 @@ router.post(
           .status(400)
           .json({ error: "A user with this email exists already" });
       }
+
+      // hashing the password
+      const salt =await bcrypt.genSalt(10);
+      const secPass =await bcrypt.hash(req.body.password, salt);
+
+      // creates a user
       user = await User.create({
         name: req.body.name,
         email: req.body.email,
-        password: req.body.password,
+        password: secPass,
       })
-        .then((user) => res.json(user))
-        .catch((err) => {
-          console.log(err);
-          res.status(500).send("Internal Server Error");
-        });
-    } catch (error) {
+      const data={
+        user:{
+          id:user.id
+        }
+      }
+      const authToken=jwt.sign(data,jwt_secret);
+      res.json(authToken);
+    } 
+    catch (error) {
       console.log(error.message);
       req.status(500).json("some error occured");
     }
